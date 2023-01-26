@@ -1,0 +1,51 @@
+#!/bin/sh
+
+# gitで最初に実行するコマンドをまとめて実行
+echo "以下のコマンドを実行します。"
+echo "git init"
+echo "git config --global user.name \"kotameyan\""
+echo "git config --global user.email kota.matsu0515@gmail.com"
+git init
+git config --global user.name "kotameyan"
+git config --global user.email kota.matsu0515@gmail.com
+echo "実行が完了しました。"
+
+echo ""
+
+# GitHub上のリモートリポジトリと接続するか尋ねる
+echo "このままGitHub上のリモートリポジトリと接続しますか？（y/n）"
+
+# 入力内容がちゃんと y or n になっているかどうか判断する変数 is_true
+is_true=false
+
+while ! $is_true
+do
+    # 入力内容を変数connectionに代入
+    read connection
+    echo ""
+
+    if [ $connection = "y" ]; then
+        is_true=true
+        # GitHub上のリモートリポジトリと接続する
+        echo "接続するGitHub上のリモートリポジトリの略称名を入力してください。"
+        read gitname
+        echo ""
+        echo "接続するGitHub上のリモートリポジトリのURLを入力してください。"
+        read giturl
+        echo ""
+        echo "以下のコマンドを実行し、指定したリモートリポジトリと接続します。"
+        echo "git remote add $gitname $giturl"
+        git remote add $gitname $giturl
+        echo "接続が完了しました。"
+        echo ""
+    elif [ $connection = "n" ]; then
+        is_true=true
+        # while文から抜け出す
+    else 
+        # もう一度connectionに値を代入
+        echo "y or n を入力してください。"
+        echo "このままGitHub上のリモートリポジトリと接続しますか？（y/n）"
+    fi
+done
+
+echo "準備が整いました！良い開発ライフを！"
