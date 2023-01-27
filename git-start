@@ -1,51 +1,297 @@
 #!/bin/sh
 
-# gitで最初に実行するコマンドをまとめて実行
-echo "以下のコマンドを実行します。"
-echo "git init"
-echo "git config --global user.name \"kotameyan\""
-echo "git config --global user.email kota.matsu0515@gmail.com"
-git init
-git config --global user.name "kotameyan"
-git config --global user.email kota.matsu0515@gmail.com
-echo "実行が完了しました。"
+# --------------------------関数定義--------------------------
+# 特殊キーを認識する関数
+CaptureSpecialKeys(){
+    local SELECTION rest
 
+    IFS= read -r -n1 -s SELECTION
+    #echo "$SELECTION" | hexdump >&2
+    if [[ $SELECTION == $'\x1b' ]]; then
+        read -r -n2 -s rest
+        SELECTION+="$rest"
+    else
+        if [[ "$SELECTION" == '' ]] ;then
+            echo "Enter"
+            return 0
+        else
+            read -r rest
+            echo "$SELECTION$rest"
+            return 0
+        fi
+    fi
+
+
+    case $SELECTION in
+        $'\x1b\x5b\x41') #up arrow
+            echo "Up"
+            ;;
+        $'\x1b\x5b\x42') #down arrow
+            echo "Down"
+            ;;
+        $'\x1b\x5b\x43') #right arrow
+            echo "Right"
+            ;;
+        $'\x1b\x5b\x44') #left arrow
+            echo "Left"
+            ;;
+        $'\x20') #space
+            echo "Space"
+            ;;
+    esac
+}
+
+# エスケープシーケンスを用いた関数
+ClearScreen(){
+    printf "\033[2J"
+}
+ClearRight(){
+    printf "\033[0K"
+}
+ClearLeft(){
+    printf "\033[1K"
+}
+ClearLine(){
+    printf "\033[2K"
+}
+MoveCursor(){
+    printf "\033[%d;%dH" "$1" "$2"
+}
+MoveCursorUp(){
+    printf "\033[%dA" "$1"
+}
+MoveCursorDown(){
+    printf "\033[%dB" "$1"
+}
+MoveCursorRight(){
+    printf "\033[%dC" "$1"
+}
+MoveCursorLeft(){
+    printf "\033[%dD" "$1"
+}
+SaveCursor(){
+    printf "\033[s"
+}
+ResetStyle(){
+    printf "\033[0m"
+}
+ClearUpperLines(){
+    for i in $(seq 1 "$1"); do
+        MoveCursorUp 1
+        ClearLine
+    done
+}
+
+# メニューを表示する関数
+ShowMenu(){
+    for i in "${!Choices[@]}"; do
+        if [[ "$i" = "$CurrentChoice" ]]; then
+            printf "\033[47m${Choices[$i]}\033[0m\n"
+        else
+            printf " ${Choices[$i]} \n"
+        fi
+    done
+}
+
+# メニューを更新する関数
+UpdateMenuScreen(){
+    ClearUpperLines "${#Choices[@]}"
+    ShowMenu
+}
+
+# メニューを生成する関数
+GenerateMenu(){
+    # 実行するpythonファイルのリストを取得
+    Choices=(${1})
+
+    # 何番目が指定されているか記憶する変数を作成
+    CurrentChoice=0
+
+    # 入力したキーを受け取る変数を作成
+    Key=""
+
+    # メニューを表示する
+    ShowMenu
+
+    # カーソルを非表示にする
+    printf "\033[?25l"
+
+    # メニューの中から項目を選択する
+    while [[ -z "$Key" ]]; do
+        Key="$(CaptureSpecialKeys)"
+        case "$Key" in
+            Up)
+                if (( "$CurrentChoice" != 0 )); then
+                    CurrentChoice=$((CurrentChoice - 1))
+                    UpdateMenuScreen
+                fi
+                ;;
+            Down)
+                if (( "$CurrentChoice" != "${#Choices[@]}" - 1 )); then
+                    CurrentChoice=$((CurrentChoice + 1))
+                    UpdateMenuScreen
+                fi
+                ;;
+            Enter)
+                break
+                ;;
+        esac
+        Key=""
+    done 
+
+    # カーソルを表示する
+    printf "\033[?25h"
+
+    # 選択メニューを削除
+    for i in "${!Choices[@]}"; do
+        MoveCursorUp
+        ClearLine
+    done
+
+    # 選択された項目
+    menuresult=${Choices[$CurrentChoice]}
+}
+
+# --------------------------ここから処理--------------------------
+# 最初の挨拶
+title=$(basename `pwd`)
+echo ""
+echo ""
+printf "\033[1mようこそ！\033[0m\n"
+printf "\033[1m$title フォルダをGitHubにアップロードしましょう！\033[0m\n"
+echo ""
+echo ""
 echo ""
 
-# GitHub上のリモートリポジトリと接続するか尋ねる
-echo "このままGitHub上のリモートリポジトリと接続しますか？（y/n）"
+# ローカルリポジトリの作成
+printf "\033[1m① ローカルリポジトリを作成する\033[0m\n"
+echo "------------------------------"
+printf "\033[32m* ローカルリポジトリを作成します。\033[0m\n"
+printf "\033[31mgit init\033[0m\n"
+git init
+printf "\033[32m* 完了しました。\033[0m\n"
+echo ""
+echo ""
+echo ""
 
-# 入力内容がちゃんと y or n になっているかどうか判断する変数 is_true
-is_true=false
+# 次の操作を選択
+echo "＜この後の操作を選択してください。＞"
+item=("リモートリポジトリを新規作成してpushする" "既存のリモートリポジトリに接続してpullする" "終了する")
+GenerateMenu "${item[*]}"
+secondoperation=$menuresult
 
-while ! $is_true
-do
-    # 入力内容を変数connectionに代入
-    read connection
+# 次の操作
+if [ "$secondoperation" == "リモートリポジトリを新規作成してpushする" ]; then
+    ClearUpperLines 1
+    printf "\033[1m② リモートリポジトリを新規作成してpushする\033[0m\n"
+    echo "------------------------------------------"
+
+    # 新しくリモートリポジトリを作成
+    while true
+    do
+        echo "＜リモートリポジトリの名前を決めてください。＞"
+        echo "＜ただし、カレントディレクトリの名前をそのまま使う場合は、enterを押してください。＞"
+
+        # 名前を入力してもらう
+        printf "名前 : "
+        read reponame
+        if [ "$reponame" == "" ]; then
+            reponame=$(basename `pwd`)
+        fi
+
+        # 決定した名前を表示
+        ClearUpperLines 3
+        echo "リモートリポジトリ名 : $reponame"
+
+        # 公開設定を選択
+        echo "＜公開設定を選択してください。＞"
+        item=("public" "private")
+        GenerateMenu "${item[*]}"
+        visivility=$menuresult
+
+        # 決定した公開設定を表示
+        ClearUpperLines 1
+        echo "公開設定 : $visivility"
+
+        # リポジトリ作成前の最終確認
+        echo ""
+        echo "＜以上の条件でリモートリポジトリを作成します。よろしいですか？＞"
+        item=("はい" "いいえ")
+        GenerateMenu "${item[*]}"
+        finalcheck=$menuresult
+
+        # 「いいえ」の場合、最初からやり直す / 「はい」の場合、進む
+        if [ "$finalcheck" == "いいえ" ]; then
+            ClearUpperLines 5
+        else
+            break
+        fi
+    done
+
+    # リモートリポジトリを作成
+    ClearUpperLines 5
+    printf "\033[32m* リモートリポジトリを作成します。\033[0m\n"
+    printf "\033[31mgh repo create $reponame --$visivility\033[0m\n"
+    gh repo create $reponame --$visivility
+    printf "\033[32m* 完了しました。\033[0m\n"
+    printf " → \033[4mリポジトリ名 : $reponame\033[0m\n"
+    printf " → \033[4m公開設定 : $visivility\033[0m\n"
+    printf " → \033[4mURL : https://github.com/kotameyan/$reponame\033[0m\n"
+    echo ""
+    echo ""
+    
+    # リモートリポジトリに接続する
+    printf "\033[32m* リモートリポジトリに接続します。\033[0m\n"
+    printf "\033[31mgit remote add origin https://github.com/kotameyan/$reponame\033[0m\n"
+    git remote add origin https://github.com/kotameyan/$reponame
+    printf "\033[32m* 完了しました。\033[0m\n"
+    echo ""
     echo ""
 
-    if [ $connection = "y" ]; then
-        is_true=true
-        # GitHub上のリモートリポジトリと接続する
-        echo "接続するGitHub上のリモートリポジトリの略称名を入力してください。"
-        read gitname
-        echo ""
-        echo "接続するGitHub上のリモートリポジトリのURLを入力してください。"
-        read giturl
-        echo ""
-        echo "以下のコマンドを実行し、指定したリモートリポジトリと接続します。"
-        echo "git remote add $gitname $giturl"
-        git remote add $gitname $giturl
-        echo "接続が完了しました。"
-        echo ""
-    elif [ $connection = "n" ]; then
-        is_true=true
-        # while文から抜け出す
-    else 
-        # もう一度connectionに値を代入
-        echo "y or n を入力してください。"
-        echo "このままGitHub上のリモートリポジトリと接続しますか？（y/n）"
-    fi
-done
+    # pushする
+    printf "\033[32m* リモートリポジトリにpushします。\033[0m\n"
+    printf "\033[31mgit add .\033[0m\n"
+    git add .
+    printf "\033[31mgit commit -m \"first commit.\"\033[0m\n"
+    git commit -m "first commit."
+    printf "\033[31mgit push --set-upstream origin master\033[0m\n"
+    git push --set-upstream origin master
+    printf "\033[32m* 完了しました。\033[0m\n"
+    echo ""
+    echo ""
+    echo ""
 
-echo "準備が整いました！良い開発ライフを！"
+elif [ "$secondoperation" == "既存のリモートリポジトリに接続してpullする" ]; then
+    ClearUpperLines 1
+    printf "\033[1m② 既存のリモートリポジトリに接続してpullする\033[0m\n"
+    echo "------------------------------------------"
+
+    # 接続するリモートリポジトリのURLを入力
+    echo "＜接続するGitHub上のリモートリポジトリのURLを入力してください。＞"
+    printf "URL : "
+    read repourl
+
+    # リモートリポジトリと接続
+    ClearUpperLines 2
+    printf "\033[32m* リモートリポジトリと接続します。\033[0m\n"
+    printf "\033[31mgit remote add origin $repourl\033[0m\n"
+    git remote add origin $repourl
+    printf "\033[32m* 完了しました。\033[0m\n"
+    echo ""
+    echo ""
+
+    #pullする
+    printf "\033[32m* リモートリポジトリからpullします。\033[0m\n"
+    printf "\033[31mgit pull origin master\033[0m\n"
+    git pull origin master
+    printf "\033[32m* 完了しました。\033[0m\n"
+    echo ""
+    echo ""
+    echo ""
+
+elif [ "$secondoperation" == "終了する" ]; then
+    # 終了する
+    ClearUpperLines 1
+else
+    echo "error"
+fi
