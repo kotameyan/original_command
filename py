@@ -1,33 +1,28 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-# 入力した特殊キーを判別してくれる関数
-capture_special_keys(){
+# --------------------------関数定義--------------------------
+# 特殊キーを認識する関数
+CaptureSpecialKeys(){
     local SELECTION rest
+
     IFS= read -r -n1 -s SELECTION
+    #echo "$SELECTION" | hexdump >&2
     if [[ $SELECTION == $'\x1b' ]]; then
         read -r -n2 -s rest
         SELECTION+="$rest"
     else
-        case "$SELECTION" in
-            "")
-                echo "Enter"
-                ;;
-            $'\x7f')
-                echo "Backspace"
-                ;;
-            $'\x20')
-                echo "Space"
-                ;;
-            *)
-                read -i "$SELECTION" -e -r rest
-                echo "$rest"
-                ;;
-        esac
-        return 0
+        if [[ "$SELECTION" == '' ]] ;then
+            echo "Enter"
+            return 0
+        else
+            read -r rest
+            echo "$SELECTION$rest"
+            return 0
+        fi
     fi
 
+
     case $SELECTION in
-        # backspace 
         $'\x1b\x5b\x41') #up arrow
             echo "Up"
             ;;
@@ -40,62 +35,119 @@ capture_special_keys(){
         $'\x1b\x5b\x44') #left arrow
             echo "Left"
             ;;
+        $'\x20') #space
+            echo "Space"
+            ;;
     esac
 }
 
-# 実行するpythonファイルのリストを取得
-files=($(ls -t -1 *.py))
+# エスケープシーケンスを用いた関数
+ClearScreen(){
+    printf "\033[2J"
+}
+ClearRight(){
+    printf "\033[0K"
+}
+ClearLeft(){
+    printf "\033[1K"
+}
+ClearLine(){
+    printf "\033[2K"
+}
+MoveCursor(){
+    printf "\033[%d;%dH" "$1" "$2"
+}
+MoveCursorUp(){
+    printf "\033[%dA" "$1"
+}
+MoveCursorDown(){
+    printf "\033[%dB" "$1"
+}
+MoveCursorRight(){
+    printf "\033[%dC" "$1"
+}
+MoveCursorLeft(){
+    printf "\033[%dD" "$1"
+}
+SaveCursor(){
+    printf "\033[s"
+}
+ResetStyle(){
+    printf "\033[0m"
+}
+ClearUpperLines(){
+    for i in $(seq 1 "$1"); do
+        MoveCursorUp 1
+        ClearLine
+    done
+}
 
-# filesの要素の最後尾を取得
-end_elem=$((${#files[@]}-1))
-
-# 現在選択されている項目の番号を記憶する変数（最初は一番上が選択されている）
-selected=0
-
-# 項目を選択する
-while true
-do
-    # 画面をクリアし、選択画面の表示を準備
-    echo "\033[f"
-    echo "\033[2J"
-    echo "\033[2A"
-
-    # 選択画面を表示する
-    for i in ${!files[@]}
-    do
-        if [ $i -eq $selected ]; then
-            echo "\033[7m ${files[$i]} \033[0m"
+# メニューを表示する関数
+ShowMenu(){
+    for i in "${!Choices[@]}"; do
+        if [[ "$i" = "$CurrentChoice" ]]; then
+            printf "\033[47m${Choices[$i]}\033[0m\n"
         else
-            echo "${files[$i]}"
+            printf " ${Choices[$i]} \n"
         fi
     done
+}
 
-    # キー入力を受け入れる
-    key="$(capture_special_keys)"
-    # echo $key
+# メニューを更新する関数
+UpdateMenuScreen(){
+    ClearUpperLines "${#Choices[@]}"
+    ShowMenu
+}
 
-    # ↑キーで選択しているものを上にずらす
-    if [ $key = "Up" ]; then
-        if [ $selected -gt 0 ]; then
-            selected=$(($selected-1))
-        fi
-    fi
 
-    # ↓キーで選択しているものを下にずらす
-    if [ $key = "Down" ]; then
-        if [ $selected -lt $end_elem ]; then
-            selected=$(($selected+1))
-        fi
-    fi
 
-    # エンターで選択を決定する
-    if [ "$key" = "Enter" ]; then
-        break
-    fi
-done
+# --------------------------処理--------------------------
+# 実行するpythonファイルのリストを取得
+Choices=($(ls -t -1 *.py))
+
+# 何番目が指定されているか記憶する変数を作成
+CurrentChoice=0
+
+# 入力したキーを受け取る変数を作成
+Key=""
+
+# メニューを表示する
+ShowMenu
+
+# カーソルを非表示にする
+printf "\033[?25l"
+
+# メニューの中から項目を選択する
+while [[ -z "$Key" ]]; do
+    Key="$(CaptureSpecialKeys)"
+    case "$Key" in
+        Up)
+            if (( "$CurrentChoice" != 0 )); then
+                CurrentChoice=$((CurrentChoice - 1))
+                UpdateMenuScreen
+            fi
+            ;;
+        Down)
+            if (( "$CurrentChoice" != "${#Choices[@]}" - 1 )); then
+                CurrentChoice=$((CurrentChoice + 1))
+                UpdateMenuScreen
+            fi
+            ;;
+        Enter)
+            break
+            ;;
+    esac
+    Key=""
+done 
+
+# カーソルを表示する
+printf "\033[?25h"
 
 # 選択したPythonファイルを実行
 echo ""
-echo "python3 ${files[$selected]}"
+echo "python3 ${Choices[$CurrentChoice]}"
 echo "----------------------------------------"
-python3 ${files[$selected]}
+python3 ${Choices[$CurrentChoice]}
+
+# Referred to the following sites
+# https://gist.github.com/Hayao0819/d7554f55ccd84a53b5973764497d5714
