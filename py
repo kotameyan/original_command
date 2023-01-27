@@ -143,6 +143,12 @@ done
 # カーソルを表示する
 printf "\033[?25h"
 
+# 選択メニューを削除
+for i in "${!Choices[@]}"; do
+    MoveCursorUp
+    ClearLine
+done
+
 # 選択したPythonファイルを実行
 echo ""
 echo "python3 ${Choices[$CurrentChoice]}"
