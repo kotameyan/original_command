@@ -99,55 +99,67 @@ UpdateMenuScreen(){
     ShowMenu
 }
 
+# メニューを生成する関数
+GenerateMenu(){
+    # 実行するpythonファイルのリストを取得
+    Choices=(${1})
+
+    # 何番目が指定されているか記憶する変数を作成
+    CurrentChoice=0
+
+    # 入力したキーを受け取る変数を作成
+    Key=""
+
+    # メニューを表示する
+    ShowMenu
+
+    # カーソルを非表示にする
+    printf "\033[?25l"
+
+    # メニューの中から項目を選択する
+    while [[ -z "$Key" ]]; do
+        Key="$(CaptureSpecialKeys)"
+        case "$Key" in
+            Up)
+                if (( "$CurrentChoice" != 0 )); then
+                    CurrentChoice=$((CurrentChoice - 1))
+                    UpdateMenuScreen
+                fi
+                ;;
+            Down)
+                if (( "$CurrentChoice" != "${#Choices[@]}" - 1 )); then
+                    CurrentChoice=$((CurrentChoice + 1))
+                    UpdateMenuScreen
+                fi
+                ;;
+            Enter)
+                break
+                ;;
+        esac
+        Key=""
+    done 
+
+    # カーソルを表示する
+    printf "\033[?25h"
+
+    # 選択メニューを削除
+    for i in "${!Choices[@]}"; do
+        MoveCursorUp
+        ClearLine
+    done
+
+    # 選択された項目
+    # ${Choices[$CurrentChoice]}
+}
+
 
 
 # --------------------------処理--------------------------
 # 実行するpythonファイルのリストを取得
-Choices=($(ls -t -1 *.py))
+files=($(ls -t -1 *.py))
 
-# 何番目が指定されているか記憶する変数を作成
-CurrentChoice=0
-
-# 入力したキーを受け取る変数を作成
-Key=""
-
-# メニューを表示する
-ShowMenu
-
-# カーソルを非表示にする
-printf "\033[?25l"
-
-# メニューの中から項目を選択する
-while [[ -z "$Key" ]]; do
-    Key="$(CaptureSpecialKeys)"
-    case "$Key" in
-        Up)
-            if (( "$CurrentChoice" != 0 )); then
-                CurrentChoice=$((CurrentChoice - 1))
-                UpdateMenuScreen
-            fi
-            ;;
-        Down)
-            if (( "$CurrentChoice" != "${#Choices[@]}" - 1 )); then
-                CurrentChoice=$((CurrentChoice + 1))
-                UpdateMenuScreen
-            fi
-            ;;
-        Enter)
-            break
-            ;;
-    esac
-    Key=""
-done 
-
-# カーソルを表示する
-printf "\033[?25h"
-
-# 選択メニューを削除
-for i in "${!Choices[@]}"; do
-    MoveCursorUp
-    ClearLine
-done
+#選択メニューを展開
+GenerateMenu "${files[*]}"
 
 # 選択したPythonファイルを実行
 echo ""
