@@ -157,8 +157,8 @@ GenerateMenu(){
 title=$(basename `pwd`)
 echo ""
 echo ""
+echo ""
 printf "\033[1mようこそ！\033[0m\n"
-printf "\033[1m$title フォルダをGitHubにアップロードしましょう！\033[0m\n"
 echo ""
 echo ""
 echo ""
@@ -202,6 +202,7 @@ if [ "$secondoperation" == "リモートリポジトリを新規作成してpush
         # 決定した名前を表示
         ClearUpperLines 3
         echo "リモートリポジトリ名 : $reponame"
+        echo ""
 
         # 公開設定を選択
         echo "＜公開設定を選択してください。＞"
@@ -212,9 +213,9 @@ if [ "$secondoperation" == "リモートリポジトリを新規作成してpush
         # 決定した公開設定を表示
         ClearUpperLines 1
         echo "公開設定 : $visivility"
+        echo ""
 
         # リポジトリ作成前の最終確認
-        echo ""
         echo "＜以上の条件でリモートリポジトリを作成します。よろしいですか？＞"
         item=("はい" "いいえ")
         GenerateMenu "${item[*]}"
@@ -295,3 +296,9 @@ elif [ "$secondoperation" == "終了する" ]; then
 else
     echo "error"
 fi
+
+# 最後のメッセージ
+printf "\033[1m準備が整いました！\033[0m\n"
+printf "\033[1m良い開発ライフを！\033[0m\n"
+echo ""
+echo ""
